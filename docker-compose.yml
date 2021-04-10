@@ -1,15 +1,61 @@
 version: '3'
 
-services:
+networks:
+  frontend:
+    driver: ${NETWORKS_DRIVER}
+  backend:
+    driver: ${NETWORKS_DRIVER}
 
-  mysql-db:
-    container_name: mysql-docker        # 指定容器的名称
-    image: mysql:8.0                  # 指定镜像和版本
-    ports:
-      - "3306:3306"
+volumes:
+  mysql:
+    driver: ${VOLUMES_DRIVER}
+  redis:
+    driver: ${VOLUMES_DRIVER}
+  memcached:
+    driver: ${VOLUMES_DRIVER}
+services:
+### MySQL ################################################
+  mysql:
+    build:
+      context: ./mysql
+      args:
+        - MYSQL_VERSION=${MYSQL_VERSION}
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      # MYSQL_ROOT_HOST: ${MYSQL_ROOT_HOST}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - TZ=${WORKSPACE_TIMEZONE}
     volumes:
-      - "${MYSQL_DIR}/data:/var/lib/mysql"           # 挂载数据目录
-      - "${MYSQL_DIR}/config:/etc/mysql/conf.d"      # 挂载配置文件目录
+      - ${DATA_PATH_HOST}/mysql:/var/lib/mysql
+      - ${MYSQL_ENTRYPOINT_INITDB}:/docker-entrypoint-initdb.d
+    ports:
+      - "${MYSQL_PORT}:3306"
+    networks:
+      - backend
+    restart: always
+### Redis ################################################
+  redis:
+    build: ./redis
+    volumes:
+      - ${DATA_PATH_HOST}/redis:/data
+    ports:
+      - "${REDIS_PORT}:6379"
+    networks:
+      - backend
+    restart: always
+    # logging:
+    #   driver: gelf
+    #   options:
+    #     # 将 x.x.x.x 替换成你的 IP
+    #     gelf-address: udp://127.0.0.1:12201
+    #     tag: "redis"
+### Memcached ############################################
+  memcached:
+    build: ./memcached
+    volumes:
+      - ${DATA_PATH_HOST}/memcached:/var/lib/memcached
+    ports:
+      - "${MEMCACHED_HOST_PORT}:11211"
+    networks:
+      - backend
